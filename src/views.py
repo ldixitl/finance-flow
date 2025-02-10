@@ -58,12 +58,12 @@ def filter_transactions_by_month(transaction_list: List[Dict], current_date: str
     start_date = today_date.replace(day=1)
 
     filtered_transactions = []
-    for transaction in transaction_list:
+    for i, transaction in enumerate(transaction_list, start=1):
         transaction_date_str = transaction.get("Дата операции")
 
         if not isinstance(transaction_date_str, str):
             logger.error(
-                f"""Некорректный тип данных в дате (id={transaction_list.index(transaction) + 1}).
+                f"""Некорректный тип данных в дате (id = {i}).
 Ожидается строка, получено {type(transaction_date_str)}."""
             )
             continue
@@ -71,9 +71,7 @@ def filter_transactions_by_month(transaction_list: List[Dict], current_date: str
         try:
             transaction_date = datetime.strptime(transaction_date_str.split()[0], "%d.%m.%Y").date()
         except ValueError:
-            logger.error(
-                f"Ошибка парсинга даты (id={transaction_list.index(transaction) + 1}): '{transaction_date_str}'"
-            )
+            logger.error(f"Ошибка парсинга даты (id = {i}): '{transaction_date_str}'")
             continue
 
         if today_date >= transaction_date >= start_date:
@@ -92,24 +90,22 @@ def cost_analysis(transaction_list: List[Dict]) -> List[Dict]:
     logger.info(f"Вызов функции 'cost_analysis'. Количество полученных транзакций: '{len(transaction_list)}'.")
     card_summary = {}
 
-    for transaction in transaction_list:
+    for i, transaction in enumerate(transaction_list, start=1):
         card_number = transaction.get("Номер карты")
         amount = transaction.get("Сумма операции")
 
         if not isinstance(amount, (float, int, str)):
-            logger.warning(f"Некорректный тип данных суммы: {amount}. ID = {transaction_list.index(transaction) + 1})")
+            logger.warning(f"Некорректный тип данных суммы: {amount}. ID = {i})")
             continue
 
         try:
             amount_float = float(amount)
         except ValueError:
-            logger.warning(
-                f"Ошибка при конвертации: {amount}. ID = {transaction_list.index(transaction) + 1})", exc_info=True
-            )
+            logger.warning(f"Ошибка при конвертации: {amount}. ID = {i})", exc_info=True)
             continue
 
         if amount_float >= 0:
-            logger.info(f"Транзакция не является расходом. ID = {transaction_list.index(transaction) + 1})")
+            logger.info(f"Транзакция не является расходом. ID = {i})")
             continue
 
         if isinstance(card_number, str):
