@@ -129,3 +129,40 @@ def cost_analysis(transaction_list: List[Dict]) -> List[Dict]:
 
     logger.info(f"Обработано карт: {len(card_list)}.")
     return card_list
+
+
+def get_top_transactions(transaction_list: List[Dict]) -> List[Dict]:
+    """
+    Функция для подсчёта 5-ти самых затратных транзакций.
+    :param transaction_list: Список словарей с данными о транзакциях.
+    :return: Список словарей с данными о 5-ти самых затратных транзакциях. В случае ошибки возвращает пустой список.
+    """
+    logger.info(f"Вызов функции 'get_top_transactions'. Количество полученных транзакций: '{len(transaction_list)}'.")
+    try:
+        spending_transactions = [
+            trans
+            for trans in transaction_list
+            if trans.get("Сумма операции", 0) < 0 and trans.get("Статус", "").upper() != "FAILED"
+        ]
+
+        if not spending_transactions:
+            logger.warning("Не найдено ни одной подходящей операции.")
+            return []
+
+        top_5_transaction = sorted(spending_transactions, key=lambda x: x["Сумма операции"])[:5]
+
+        result = []
+        for i, transaction in enumerate(top_5_transaction, start=1):
+            date = transaction.get("Дата операции", "N/A")
+            amount = transaction.get("Сумма операции", 0)
+            category = transaction.get("Категория", "Неизвестно")
+            description = transaction.get("Описание", "Без описания")
+
+            result.append({"date": date, "amount": amount, "category": category, "description": description})
+            logger.info(f"Добавлено место {i}. {date} | {amount} | {category} | {description}")
+
+        logger.info(f"Топ-5 транзакций успешно сформирован. Количество: {len(result)}.")
+        return result
+    except Exception as e:
+        logger.error(f"Ошибка в 'get_top_transactions': {e}", exc_info=True)
+        return []
