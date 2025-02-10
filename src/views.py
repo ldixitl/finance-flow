@@ -52,7 +52,7 @@ def filter_transactions_by_month(transaction_list: List[Dict], current_date: str
     """
     logger.info(
         f"""Вызов функции 'filter_transactions_by_month' с параметром '{current_date}'.
-Количество транзакций: {len(transaction_list)}."""
+Количество полученных транзакций: {len(transaction_list)}."""
     )
     today_date = parser.parse(current_date).date()
     start_date = today_date.replace(day=1)
@@ -81,3 +81,51 @@ def filter_transactions_by_month(transaction_list: List[Dict], current_date: str
 
     logger.info(f"Количество транзакций после фильтрации: {len(filtered_transactions)}")
     return filtered_transactions
+
+
+def cost_analysis(transaction_list: List[Dict]) -> List[Dict]:
+    """
+    Функция группирует траты по картам.
+    :param transaction_list: Список словарей с данными о транзакциях.
+    :return: Список словарей с информацией о картах.
+    """
+    logger.info(f"Вызов функции 'cost_analysis'. Количество полученных транзакций: '{len(transaction_list)}'.")
+    card_summary = {}
+
+    for transaction in transaction_list:
+        card_number = transaction.get("Номер карты")
+        amount = transaction.get("Сумма операции")
+
+        if not isinstance(amount, (float, int, str)):
+            logger.warning(f"Некорректный тип данных суммы: {amount}. ID = {transaction_list.index(transaction) + 1})")
+            continue
+
+        try:
+            amount_float = float(amount)
+        except ValueError:
+            logger.warning(
+                f"Ошибка при конвертации: {amount}. ID = {transaction_list.index(transaction) + 1})", exc_info=True
+            )
+            continue
+
+        if amount_float >= 0:
+            logger.info(f"Транзакция не является расходом. ID = {transaction_list.index(transaction) + 1})")
+            continue
+
+        if isinstance(card_number, str):
+            last_digits = card_number[-4:]
+        else:
+            last_digits = "N/A"
+
+        if last_digits not in card_summary:
+            card_summary[last_digits] = 0.0
+
+        logger.info(f"Карта {last_digits}: добавлен расход {abs(amount_float)}")
+        card_summary[last_digits] += abs(amount_float)
+
+    card_list = []
+    for card, spent in card_summary.items():
+        card_list.append({"last_digits": card, "total_spent": round(spent, 2), "cashback": round(spent * 0.01, 2)})
+
+    logger.info(f"Обработано карт: {len(card_list)}.")
+    return card_list
