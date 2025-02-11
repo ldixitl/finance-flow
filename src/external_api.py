@@ -7,8 +7,10 @@ from dotenv import load_dotenv
 
 # Загрузка переменных окружения
 load_dotenv()
-API_KEY_EXCHANGER = os.getenv("API_KEY_EXCHANGER")
-URL_EXCHANGER = os.getenv("URL_EXCHANGER")
+API_KEY_CURRENCY = os.getenv("API_KEY_CURRENCY")
+URL_CURRENCY = os.getenv("URL_CURRENCY")
+API_KEY_STOCK = os.getenv("API_KEY_STOCK")
+URL_STOCK = os.getenv("URL_STOCK")
 
 # Настройка логирования
 logger = logging.getLogger("e_api")
@@ -27,26 +29,27 @@ def currency_exchanger(currencies_list: List) -> List[Dict]:
     :param currencies_list: Список кодов валют.
     :return: Список словарей с данными о курсе валют.
     """
-    logger.info(f"Вызов функции 'currency_exchanger' с параметром '{currencies_list}'")
-    if not API_KEY_EXCHANGER:
-        logger.error("API_KEY_EXCHANGER is not set.")
+    logger.info(f"Вызов функции 'currency_exchanger' с параметром '{currencies_list}'.")
+
+    if not API_KEY_CURRENCY:
+        logger.error("API_KEY_CURRENCY не задан.")
         return []
 
     currencies_rates = []
     for currency in currencies_list:
 
         payload = {"to": "RUB", "from": currency, "amount": 1}
-        headers = {"apikey": API_KEY_EXCHANGER}
+        headers = {"apikey": API_KEY_CURRENCY}
 
         try:
-            response = requests.get(URL_EXCHANGER, headers=headers, params=payload)
+            response = requests.get(URL_CURRENCY, headers=headers, params=payload)
             response.raise_for_status()
             data = response.json()
 
             if "result" in data:
                 rate = round(data["result"], 2)
                 currencies_rates.append({"currency": currency, "rate": rate})
-                logger.info(f"Курс {currency} -> RUB: {rate}")
+                logger.info(f"Курс '{currency}' -> RUB: {rate}.")
             else:
                 logger.warning(f"Ключ 'result' отсутствует в ответе API для {currency}.")
         except requests.exceptions.RequestException as e:
@@ -62,3 +65,44 @@ def currency_exchanger(currencies_list: List) -> List[Dict]:
 
     logger.info(f"Количество валют о которых получена информация: {len(currencies_rates)}.")
     return currencies_rates
+
+
+def stock_exchanger(stocks_list: List) -> List[Dict]:
+    """
+    Функция для получения цен на акции.
+    :param stocks_list: Список тикеров акций.
+    :return: Список словарей с ценами акций в долларах.
+    """
+    logger.info(f"Вызов функции 'stock_exchanger' с параметром '{stocks_list}'.")
+
+    if not API_KEY_STOCK:
+        logger.error("API_KEY_STOCK не задан.")
+        return []
+
+    stocks_rates = []
+    for stock in stocks_list:
+        params = {"access_key": API_KEY_STOCK, "symbols": stock}
+        try:
+            response = requests.get(url=URL_STOCK, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            if "data" not in data or not isinstance(data["data"], list) or not data["data"]:
+                logger.warning(f"Данные по акции '{stock}' не найдены.")
+                continue
+
+            rate = data["data"][0]["close"]
+            stocks_rates.append({"stock": stock, "price": rate})
+            logger.info(f"Курс '{stock}' -> USD: {rate}.")
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Ошибка при запросе API для '{stock}': {e}.", exc_info=True)
+        except (KeyError, IndexError) as e:
+            logger.error(f"Ошибка в структуре ответа API для '{stock}': {e}.", exc_info=True)
+
+    if not stocks_rates:
+        logger.warning("Не удалось получить ни одного курса акций.")
+        return []
+
+    logger.info(f"Количество акций о которых получена информация: {len(stocks_rates)}.")
+    return stocks_rates
