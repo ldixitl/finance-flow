@@ -54,7 +54,7 @@ def filter_transactions_by_month(transaction_list: List[Dict], current_date: str
         f"""Вызов функции 'filter_transactions_by_month' с параметром '{current_date}'.
 Количество полученных транзакций: {len(transaction_list)}."""
     )
-    today_date = parser.parse(current_date).date()
+    today_date = parser.isoparse(current_date).date()
     start_date = today_date.replace(day=1)
 
     filtered_transactions = []
@@ -71,13 +71,13 @@ def filter_transactions_by_month(transaction_list: List[Dict], current_date: str
         try:
             transaction_date = datetime.strptime(transaction_date_str.split()[0], "%d.%m.%Y").date()
         except ValueError:
-            logger.error(f"Ошибка парсинга даты (id = {i}): '{transaction_date_str}'")
+            logger.error(f"Ошибка парсинга даты (id = {i}): '{transaction_date_str}'.", exc_info=True)
             continue
 
         if today_date >= transaction_date >= start_date:
             filtered_transactions.append(transaction)
 
-    logger.info(f"Количество транзакций после фильтрации: {len(filtered_transactions)}")
+    logger.info(f"Количество транзакций после фильтрации: {len(filtered_transactions)}.")
     return filtered_transactions
 
 
@@ -87,7 +87,7 @@ def cost_analysis(transaction_list: List[Dict]) -> List[Dict]:
     :param transaction_list: Список словарей с данными о транзакциях.
     :return: Список словарей с информацией о картах.
     """
-    logger.info(f"Вызов функции 'cost_analysis'. Количество полученных транзакций: '{len(transaction_list)}'.")
+    logger.info(f"Вызов функции 'cost_analysis'. Количество полученных транзакций: {len(transaction_list)}.")
     card_summary = {}
 
     for i, transaction in enumerate(transaction_list, start=1):
@@ -95,17 +95,17 @@ def cost_analysis(transaction_list: List[Dict]) -> List[Dict]:
         amount = transaction.get("Сумма операции")
 
         if not isinstance(amount, (float, int, str)):
-            logger.warning(f"Некорректный тип данных суммы: {amount}. ID = {i})")
+            logger.warning(f"Некорректный тип данных суммы: {amount}. ID = {i}.")
             continue
 
         try:
             amount_float = float(amount)
         except ValueError:
-            logger.warning(f"Ошибка при конвертации: {amount}. ID = {i})", exc_info=True)
+            logger.warning(f"Ошибка при конвертации: {amount}. ID = {i}.", exc_info=True)
             continue
 
         if amount_float >= 0:
-            logger.info(f"Транзакция не является расходом. ID = {i})")
+            logger.info(f"Транзакция не является расходом. ID = {i}.")
             continue
 
         if isinstance(card_number, str):
@@ -116,7 +116,7 @@ def cost_analysis(transaction_list: List[Dict]) -> List[Dict]:
         if last_digits not in card_summary:
             card_summary[last_digits] = 0.0
 
-        logger.info(f"Карта {last_digits}: добавлен расход {abs(amount_float)}")
+        logger.info(f"Карта {last_digits}: добавлен расход {abs(amount_float)}.")
         card_summary[last_digits] += abs(amount_float)
 
     card_list = []
@@ -133,7 +133,7 @@ def get_top_transactions(transaction_list: List[Dict]) -> List[Dict]:
     :param transaction_list: Список словарей с данными о транзакциях.
     :return: Список словарей с данными о 5-ти самых затратных транзакциях. В случае ошибки возвращает пустой список.
     """
-    logger.info(f"Вызов функции 'get_top_transactions'. Количество полученных транзакций: '{len(transaction_list)}'.")
+    logger.info(f"Вызов функции 'get_top_transactions'. Количество полученных транзакций: {len(transaction_list)}.")
     try:
         spending_transactions = [
             trans
@@ -155,10 +155,10 @@ def get_top_transactions(transaction_list: List[Dict]) -> List[Dict]:
             description = transaction.get("Описание", "Без описания")
 
             result.append({"date": date, "amount": amount, "category": category, "description": description})
-            logger.info(f"Добавлено место {i}. {date} | {amount} | {category} | {description}")
+            logger.info(f"Добавлено место {i}. {date} | {amount} | {category} | {description}.")
 
         logger.info(f"Топ-5 транзакций успешно сформирован. Количество: {len(result)}.")
         return result
     except Exception as e:
-        logger.error(f"Ошибка в 'get_top_transactions': {e}", exc_info=True)
+        logger.error(f"Ошибка в 'get_top_transactions': {e}.", exc_info=True)
         return []
