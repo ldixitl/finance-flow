@@ -1,9 +1,13 @@
 import json
 import logging
+import os
 
 from src.external_api import currency_exchanger, stock_exchanger
 from src.utils import transaction_parser
 from src.views import cost_analysis, filter_transactions_by_month, get_greeting, get_top_transactions
+
+log_dir = "logs"
+os.makedirs(log_dir, exist_ok=True)
 
 # Настройка логирования
 logger = logging.getLogger("main")
@@ -25,7 +29,6 @@ def main(current_datetime: str, transactions_path: str = "data/operations.xlsx")
     """
     try:
         logger.info("Начало работы приложения.")
-        # current_date = datetime.strptime(current_datetime, "%Y-%m-%d %H:%M:%S")
 
         try:
             with open("user_settings.json") as file:
