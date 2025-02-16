@@ -1,19 +1,13 @@
 import json
-import logging
 import re
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List
 
+from src.logger_config import add_logger
+
 # Настройка логирования
-logger = logging.getLogger("services")
-logger.setLevel(logging.DEBUG)
-file_handler = logging.FileHandler("../logs/services.log", mode="w", encoding="UTF-8")
-file_formatter = logging.Formatter(
-    "%(asctime)s - %(filename)s - %(levelname)s: %(message)s", datefmt="%d-%m-%Y %H:%M:%S"
-)
-file_handler.setFormatter(file_formatter)
-logger.addHandler(file_handler)
+logger = add_logger("services.log", "services")
 
 PHONE_PATTERN = re.compile(r"\+7\s\d{3}\s\d{3}[-\s]?\d{2}[-\s]?\d{2}")
 NAME_PATTERN = re.compile(r"\b[А-ЯЁ][а-яё]+\s[А-ЯЁ]\.")

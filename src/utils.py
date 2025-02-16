@@ -1,17 +1,11 @@
-import logging
 from typing import Dict, List
 
 import pandas as pd
 
+from src.logger_config import add_logger
+
 # Настройка логирования
-logger = logging.getLogger("utils")
-logger.setLevel(logging.DEBUG)
-file_handler = logging.FileHandler("logs/utils.log", mode="w", encoding="UTF-8")
-file_formatter = logging.Formatter(
-    "%(asctime)s - %(filename)s - %(levelname)s: %(message)s", datefmt="%d-%m-%Y %H:%M:%S"
-)
-file_handler.setFormatter(file_formatter)
-logger.addHandler(file_handler)
+logger = add_logger("utils.log", "utils")
 
 
 def transaction_parser(file_path: str) -> List[Dict]:

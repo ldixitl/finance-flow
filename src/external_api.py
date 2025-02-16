@@ -1,9 +1,10 @@
-import logging
 import os
 from typing import Dict, List
 
 import requests
 from dotenv import load_dotenv
+
+from src.logger_config import add_logger
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -13,14 +14,7 @@ API_KEY_STOCK = os.getenv("API_KEY_STOCK")
 URL_STOCK = os.getenv("URL_STOCK")
 
 # Настройка логирования
-logger = logging.getLogger("e_api")
-logger.setLevel(logging.DEBUG)
-file_handler = logging.FileHandler("logs/e_api.log", mode="w", encoding="UTF-8")
-file_formatter = logging.Formatter(
-    "%(asctime)s - %(filename)s - %(levelname)s: %(message)s", datefmt="%d-%m-%Y %H:%M:%S"
-)
-file_handler.setFormatter(file_formatter)
-logger.addHandler(file_handler)
+logger = add_logger("e_api.log", "e_api")
 
 
 def currency_exchanger(currencies_list: List) -> List[Dict]:

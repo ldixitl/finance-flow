@@ -1,18 +1,12 @@
-import logging
 from datetime import datetime
 from typing import Dict, List
 
 from dateutil import parser
 
+from src.logger_config import add_logger
+
 # Настройка логирования
-logger = logging.getLogger("views")
-logger.setLevel(logging.DEBUG)
-file_handler = logging.FileHandler("logs/views.log", mode="w", encoding="UTF-8")
-file_formatter = logging.Formatter(
-    "%(asctime)s - %(filename)s - %(levelname)s: %(message)s", datefmt="%d-%m-%Y %H:%M:%S"
-)
-file_handler.setFormatter(file_formatter)
-logger.addHandler(file_handler)
+logger = add_logger("views.log", "views")
 
 
 def get_greeting(current_date: str) -> str:
