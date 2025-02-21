@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import wraps
 from typing import Optional
 
@@ -19,11 +19,11 @@ def save_to_file(filename: str = None):
     def decorator(function):
         @wraps(function)
         def wrapper(*args, **kwargs):
-            logger.info(f"Запуск функции '{function.__name__}' с параметрами: {args}, {kwargs}.")
+            logger.info(f"Запуск функции '{function.__name__}'.")
             result = function(*args, **kwargs)
 
             if isinstance(result, pd.DataFrame):
-                result = result.to_dict(orient="records")
+                result_to_save = result.to_dict(orient="records")
 
             path_project = os.path.dirname(os.path.dirname(__file__))
             path_reports = os.path.join(path_project, "reports_data")
@@ -37,7 +37,7 @@ def save_to_file(filename: str = None):
 
             try:
                 with open(report_file, "w", encoding="utf-8") as file:
-                    json.dump(result, file, indent=4, ensure_ascii=False)
+                    json.dump(result_to_save, file, indent=4, ensure_ascii=False)
                 logger.info(f"Файл успешно сохранён: {report_file}")
             except (OSError, json.JSONDecodeError, TypeError) as e:
                 logger.error(f"Ошибка при сохранении отчета в {report_file}: {e}.", exc_info=True)
@@ -68,7 +68,7 @@ def spending_by_category(transactions: pd.DataFrame, category: str, date: Option
         else:
             start_date = datetime.today()
 
-        end_date = start_date - timedelta(days=90)
+        end_date = start_date - pd.DateOffset(months=3)
 
         transactions["Дата операции"] = pd.to_datetime(transactions["Дата операции"], format="%d.%m.%Y %H:%M:%S")
 
