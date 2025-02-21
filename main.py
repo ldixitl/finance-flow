@@ -2,9 +2,13 @@ import json
 import logging
 import os
 
-from src.external_api import currency_exchanger, stock_exchanger
+import pandas as pd
+
+from src.reports import spending_by_category
+from src.services import (cashback_analysis, find_personal_transfer, find_phone_numbers, investment_bank,
+                          searching_transactions)
 from src.utils import transaction_parser
-from src.views import cost_analysis, filter_transactions_by_month, get_greeting, get_top_transactions
+from src.views import main_view
 
 log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
@@ -20,67 +24,56 @@ file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)
 
 
-def main(current_datetime: str, transactions_path: str = "data/operations.xlsx") -> str:
+def main():
     """
-    Главная функция для работы приложения.
-    :param current_datetime:
-    :param transactions_path:
-    :return:
+    Главная функция, запускающая все реализованные модули проекта.
+    Последовательно вызываются:
+    - Веб-страница (main_view)
+    - Сервисы (анализ кэшбэка, инвесткопилка, поиск по транзакциям)
+    - Отчеты (траты по категории)
     """
-    try:
-        logger.info("Начало работы приложения.")
 
-        try:
-            with open("user_settings.json") as file:
-                user_settings = json.load(file)
-            logger.info("Файл 'user_settings.json' успешно загружен.")
-        except FileNotFoundError:
-            logger.warning("Файл 'user_settings.json' не найден. Используются настройки по умолчанию.")
-            user_settings = {"user_currencies": ["USD", "EUR"], "user_stocks": ["INTC", "NVDA"]}
+    logger.info("Запуск основной программы...")
 
-        user_currencies = user_settings.get("user_currencies", [])
-        user_stocks = user_settings.get("user_stocks", [])
+    # Загружаем транзакции
+    transactions = transaction_parser("data/operations.xlsx", False)
+    logger.info(f"Загружено {len(transactions)} транзакций.")
 
-        # Загрузка и фильтрация транзакций
-        transactions = transaction_parser(transactions_path)
-        logger.info("Транзакции успешно загружены.")
+    # 1️Веб-страница
+    web_response = main_view("2021-12-20 19:18:12", "data/operations.xlsx")
+    logger.info("Сформирован JSON-ответ для веб-страницы.")
+    print("Веб-страница:")
+    print(json.dumps(json.loads(web_response), indent=4, ensure_ascii=False))
 
-        monthly_transactions = filter_transactions_by_month(transactions, current_datetime)
-        logger.info("Транзакции успешно отфильтрованы за текущий месяц.")
+    # Сервисы
+    print("\nАнализ кэшбэка:")
+    cashback_result = cashback_analysis(transactions, 2021, 2)
+    print(cashback_result)
 
-        # Анализ расходов по картам
-        card_spends = cost_analysis(monthly_transactions)
-        logger.info("Расходы по картам успешно подсчитаны.")
+    print("\nИнвесткопилка:")
+    investment_result = investment_bank(transactions, "2021-02", 50)
+    print(f"Сумма накоплений: {investment_result} ₽")
 
-        # Составление топа транзакций
-        top_transactions = get_top_transactions(monthly_transactions)
-        logger.info("Топ транзакций успешно составлен.")
+    print("\nПоиск транзакций с 'Ozon.ru':")
+    search_result = searching_transactions(transactions, "Ozon.ru")
+    print(search_result)
 
-        # Получение курсов валют и акций
-        currency_rates = currency_exchanger(user_currencies)
-        logger.info("Курсы валют успешно получены.")
+    print("\nПоиск телефонных номеров в транзакциях:")
+    phone_result = find_phone_numbers(transactions)
+    print(phone_result)
 
-        stock_rates = stock_exchanger(user_stocks)
-        logger.info("Курсы акций успешно получены.")
+    print("\nПоиск переводов физическим лицам:")
+    personal_transfer_result = find_personal_transfer(transactions)
+    print(personal_transfer_result)
 
-        # Формирование JSON-ответа
-        response = {
-            "greeting": get_greeting(current_datetime),
-            "cards": card_spends,
-            "top_transactions": top_transactions,
-            "currency_rates": currency_rates,
-            "stock_rates": stock_rates,
-        }
-        result = json.dumps(response, ensure_ascii=False, indent=4)
-        logger.info("JSON-ответ успешно сформирован.")
-        return result
+    # Отчеты
+    print("\nОтчет: Траты по категории 'Переводы'")
+    transactions_df = pd.read_excel("data/operations.xlsx")
+    spending_report = spending_by_category(transactions_df, "Переводы", "2021-12-20")
+    print(spending_report)
 
-    except Exception as e:
-        logger.error(f"Произошла ошибка при работе программы: {e}.", exc_info=True)
-        return json.dumps({"error": "Произошла ошибка при обработке запроса."}, ensure_ascii=False, indent=4)
-    finally:
-        logger.info("Завершение работы программы.")
+    logger.info("Выполнение основной программы завершено.")
 
 
 if __name__ == "__main__":
-    print(main("2020-09-29 22:38:50"))
+    main()
