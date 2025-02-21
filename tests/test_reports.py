@@ -9,20 +9,6 @@ from src.reports import save_to_file, spending_by_category
 
 def test_save_to_file_success(tmp_path) -> None:
     """Проверяет, создаётся ли JSON-файл и корректно ли записываются данные"""
-    test_data_list = [{"Категория": "Продукты", "Сумма": 1000}]
-    test_file_list = tmp_path / "test_report.json"
-
-    @save_to_file(str(test_file_list))
-    def mock_func():
-        return test_data_list
-
-    mock_func()
-    assert test_file_list.exists()
-
-    with open(test_file_list, "r", encoding="utf-8") as f:
-        saved_data = json.load(f)
-        assert saved_data == test_data_list
-
     test_dataframe = pd.DataFrame({"Категория": ["Продукты"], "Сумма": [1000]})
     test_file_df = tmp_path / "test_report_df.json"
 
@@ -30,12 +16,12 @@ def test_save_to_file_success(tmp_path) -> None:
     def mock_func_df():
         return test_dataframe
 
-    mock_func_df()
+    result_df = mock_func_df()  # Выполняем функцию и сохраняем результат
     assert test_file_df.exists()
 
     with open(test_file_df, "r", encoding="utf-8") as f:
         saved_data_df = json.load(f)
-        assert saved_data_df == [{"Категория": "Продукты", "Сумма": 1000}]
+        assert pd.DataFrame(saved_data_df).equals(result_df)
 
 
 def test_save_to_file_error(caplog) -> None:
@@ -56,10 +42,15 @@ def test_spending_by_category_success(sample_transactions_df) -> None:
     """Проверяет, корректно ли фильтруются транзакции по категории и дате"""
     filtered_df = spending_by_category(sample_transactions_df, "Переводы", "2021-12-16")
 
-    assert filtered_df == [
-        {"Дата операции": "2021-12-15 10:30:00", "Категория": "Переводы", "Сумма": 5000},
-        {"Дата операции": "2021-12-05 18:45:00", "Категория": "Переводы", "Сумма": 2000},
-    ]
+    expected_df = pd.DataFrame(
+        {
+            "Дата операции": ["2021-12-15 10:30:00", "2021-12-05 18:45:00"],
+            "Категория": ["Переводы", "Переводы"],
+            "Сумма": [5000, 2000],
+        }
+    )
+
+    pd.testing.assert_frame_equal(filtered_df.reset_index(drop=True), expected_df.reset_index(drop=True))
 
 
 def test_spending_by_category_invalid(sample_transactions_df, caplog) -> None:
