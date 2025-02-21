@@ -1,158 +1,102 @@
-from datetime import datetime
-from typing import Dict, List
+import json
+import os
 
-from dateutil import parser
+import pandas as pd
 
+from src.external_api import currency_exchanger, stock_exchanger
 from src.logger_config import add_logger
+from src.utils import (cost_analysis, filter_transactions_by_month, get_greeting, get_top_transactions,
+                       transaction_parser)
 
 # Настройка логирования
 logger = add_logger("views.log", "views")
 
+path_project = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-def get_greeting(current_date: str) -> str:
+
+def convert_timestamps(obj):
     """
-    Функция подбирает необходимое приветствие в соответствии с текущим временем суток.
-    :param current_date: Строка с текущей датой в формате ISO-8601.
-    :return: Строка с приветствием.
+    Рекурсивно конвертирует pandas.Timestamp в строки внутри списка или словаря.
+    """
+    if isinstance(obj, pd.Timestamp):
+        return obj.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(obj, list):
+        return [convert_timestamps(item) for item in obj]
+    if isinstance(obj, dict):
+        return {key: convert_timestamps(value) for key, value in obj.items()}
+    return obj
+
+
+def main_view(current_datetime: str, transactions_path: str = None) -> str:
+    """
+    Главная функция обработки данных и формирования JSON-ответа.
+    :param current_datetime: Строка с датой и временем в формате 'YYYY-MM-DD HH:MM:SS'.
+    :param transactions_path: Путь до файла с транзакциями.
+    :return: JSON-ответ с анализом транзакций, курсами валют и акциями.
     """
     try:
-        logger.info(f"Вызов функции 'get_greeting' с параметром '{current_date}'.")
-        hour = parser.isoparse(current_date).hour
-        if 12 > hour >= 6:
-            logger.info("Определено приветствие: 'Доброе утро'.")
-            return "Доброе утро"
-        elif 18 > hour >= 12:
-            logger.info("Определено приветствие: 'Добрый день'.")
-            return "Добрый день"
-        elif 6 > hour >= 0:
-            logger.info("Определено приветствие: 'Доброй ночи'.")
-            return "Доброй ночи"
-        else:
-            logger.info("Определено приветствие: 'Добрый вечер'.")
-            return "Добрый вечер"
+        logger.info("Начало работы приложения.")
 
-    except (TypeError, ValueError) as e:
-        logger.error(f"Ошибка обработки даты: {e}.", exc_info=True)
-        return "Ошибка: некорректная дата"
+        # Определение путей
+        settings_path = os.path.join(path_project, "user_settings.json")
+        transactions_path = os.path.join(path_project, transactions_path)
 
-
-def filter_transactions_by_month(transaction_list: List[Dict], current_date: str) -> List[Dict]:
-    """
-    Отфильтровывает транзакции, совершённые с начала месяца по текущую дату.
-    :param transaction_list: Список словарей с данными о транзакциях.
-                            Ключ "Дата операции" должен содержать дату в формате '%d.%m.%Y'.
-    :param current_date: Строка с текущей датой в формате ISO-8601.
-    :return: Отфильтрованный список словарей с транзакциями за текущий месяц.
-    """
-    logger.info(
-        f"""Вызов функции 'filter_transactions_by_month' с параметром '{current_date}'.
-Количество полученных транзакций: {len(transaction_list)}."""
-    )
-    today_date = parser.isoparse(current_date).date()
-    start_date = today_date.replace(day=1)
-
-    filtered_transactions = []
-    for i, transaction in enumerate(transaction_list, start=1):
-        transaction_date_str = transaction.get("Дата операции")
-
-        if not isinstance(transaction_date_str, str):
-            logger.error(
-                f"""Некорректный тип данных в дате (id = {i}).
-Ожидается строка, получено {type(transaction_date_str)}."""
-            )
-            continue
-
+        # Загрузка пользовательских настроек
         try:
-            transaction_date = datetime.strptime(transaction_date_str.split()[0], "%d.%m.%Y").date()
-        except ValueError:
-            logger.error(f"Ошибка парсинга даты (id = {i}): '{transaction_date_str}'.", exc_info=True)
-            continue
+            with open(settings_path) as file:
+                user_settings = json.load(file)
+            logger.info("Файл 'user_settings.json' успешно загружен.")
+        except FileNotFoundError:
+            logger.warning("Файл 'user_settings.json' не найден. Используются настройки по умолчанию.")
+            user_settings = {"user_currencies": ["USD", "EUR"], "user_stocks": ["INTC", "NVDA"]}
 
-        if today_date >= transaction_date >= start_date:
-            filtered_transactions.append(transaction)
+        user_currencies = user_settings.get("user_currencies", [])
+        user_stocks = user_settings.get("user_stocks", [])
 
-    logger.info(f"Количество транзакций после фильтрации: {len(filtered_transactions)}.")
-    return filtered_transactions
+        # Загрузка транзакций в DataFrame
+        transactions = transaction_parser(transactions_path, as_dataframe=True).copy()
+        logger.info(f"Транзакции успешно загружены. Размер: {transactions.shape}.")
 
+        # Фильтрация транзакций за текущий месяц
+        monthly_transactions = filter_transactions_by_month(transactions, current_datetime).copy()
+        logger.info(f"Транзакции успешно отфильтрованы за месяц. Размер: {monthly_transactions.shape}.")
 
-def cost_analysis(transaction_list: List[Dict]) -> List[Dict]:
-    """
-    Функция группирует траты по картам.
-    :param transaction_list: Список словарей с данными о транзакциях.
-    :return: Список словарей с информацией о картах.
-    """
-    logger.info(f"Вызов функции 'cost_analysis'. Количество полученных транзакций: {len(transaction_list)}.")
-    card_summary = {}
+        # Анализ расходов по картам
+        card_spends = cost_analysis(monthly_transactions).copy()
+        card_spends["last_digits"] = card_spends["last_digits"].fillna("N/A")  # Обработка NaN
+        logger.info(f"Расходы по картам успешно подсчитаны. Размер: {card_spends.shape}.")
 
-    for i, transaction in enumerate(transaction_list, start=1):
-        card_number = transaction.get("Номер карты")
-        amount = transaction.get("Сумма операции")
+        # Составление топа транзакций
+        top_transactions = get_top_transactions(monthly_transactions).copy()
+        logger.info(f"Топ транзакций успешно составлен. Размер: {top_transactions.shape}.")
 
-        if not isinstance(amount, (float, int, str)):
-            logger.warning(f"Некорректный тип данных суммы: {amount}. ID = {i}.")
-            continue
+        # Получение курсов валют и акций
+        currency_rates = currency_exchanger(user_currencies)
+        logger.info(f"Курсы валют успешно получены. Количество: {len(currency_rates)}.")
 
-        try:
-            amount_float = float(amount)
-        except ValueError:
-            logger.warning(f"Ошибка при конвертации: {amount}. ID = {i}.", exc_info=True)
-            continue
+        stock_rates = stock_exchanger(user_stocks)
+        logger.info(f"Курсы акций успешно получены. Количество: {len(stock_rates)}.")
 
-        if amount_float >= 0:
-            logger.info(f"Транзакция не является расходом. ID = {i}.")
-            continue
+        # Формирование JSON-ответа с конвертацией Timestamp
+        response = {
+            "greeting": get_greeting(),
+            "cards": card_spends.to_dict(orient="records"),
+            "top_transactions": top_transactions.to_dict(orient="records"),
+            "currency_rates": currency_rates,
+            "stock_rates": stock_rates,
+        }
+        response = convert_timestamps(response)  # Конвертация Timestamps
 
-        if isinstance(card_number, str):
-            last_digits = card_number[-4:]
-        else:
-            last_digits = "N/A"
-
-        if last_digits not in card_summary:
-            card_summary[last_digits] = 0.0
-
-        logger.info(f"Карта {last_digits}: добавлен расход {abs(amount_float)}.")
-        card_summary[last_digits] += abs(amount_float)
-
-    card_list = []
-    for card, spent in card_summary.items():
-        card_list.append({"last_digits": card, "total_spent": round(spent, 2), "cashback": round(spent * 0.01, 2)})
-
-    logger.info(f"Обработано карт: {len(card_list)}.")
-    return card_list
-
-
-def get_top_transactions(transaction_list: List[Dict]) -> List[Dict]:
-    """
-    Функция для подсчёта 5-ти самых затратных транзакций.
-    :param transaction_list: Список словарей с данными о транзакциях.
-    :return: Список словарей с данными о 5-ти самых затратных транзакциях. В случае ошибки возвращает пустой список.
-    """
-    logger.info(f"Вызов функции 'get_top_transactions'. Количество полученных транзакций: {len(transaction_list)}.")
-    try:
-        spending_transactions = [
-            trans
-            for trans in transaction_list
-            if trans.get("Сумма операции", 0) < 0 and trans.get("Статус", "").upper() != "FAILED"
-        ]
-
-        if not spending_transactions:
-            logger.warning("Не найдено ни одной подходящей операции.")
-            return []
-
-        top_5_transaction = sorted(spending_transactions, key=lambda x: x["Сумма операции"])[:5]
-
-        result = []
-        for i, transaction in enumerate(top_5_transaction, start=1):
-            date = transaction.get("Дата операции", "N/A")
-            amount = transaction.get("Сумма операции", 0)
-            category = transaction.get("Категория", "Неизвестно")
-            description = transaction.get("Описание", "Без описания")
-
-            result.append({"date": date, "amount": amount, "category": category, "description": description})
-            logger.info(f"Добавлено место {i}. {date} | {amount} | {category} | {description}.")
-
-        logger.info(f"Топ-5 транзакций успешно сформирован. Количество: {len(result)}.")
+        result = json.dumps(response, ensure_ascii=False, indent=4)
+        logger.info("JSON-ответ успешно сформирован.")
         return result
+
     except Exception as e:
-        logger.error(f"Ошибка в 'get_top_transactions': {e}.", exc_info=True)
-        return []
+        logger.error(f"Произошла ошибка при работе программы: {e}.", exc_info=True)
+        return json.dumps({"error": "Произошла ошибка при обработке запроса."}, ensure_ascii=False, indent=4)
+    finally:
+        logger.info("Завершение работы программы.")
+
+
+if __name__ == "__main__":
+    print(main_view("2020-09-29 22:38:50", "data/operations.xlsx"))
