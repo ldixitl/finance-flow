@@ -9,9 +9,9 @@ from src.logger_config import add_logger
 # Загрузка переменных окружения
 load_dotenv()
 API_KEY_CURRENCY = os.getenv("API_KEY_CURRENCY")
-URL_CURRENCY = os.getenv("URL_CURRENCY")
+URL_CURRENCY = "https://api.apilayer.com/exchangerates_data/convert"
 API_KEY_STOCK = os.getenv("API_KEY_STOCK")
-URL_STOCK = os.getenv("URL_STOCK")
+URL_STOCK = "http://api.marketstack.com/v1/eod/latest"
 
 # Настройка логирования
 logger = add_logger("e_api.log", "e_api")
