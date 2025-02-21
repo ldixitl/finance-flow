@@ -80,6 +80,11 @@ def filter_transactions_by_month(transactions: pd.DataFrame, current_date: str) 
         f"""Вызов функции 'filter_transactions_by_month' с параметром '{current_date}'.
 Количество полученных транзакций: {len(transactions)}."""
     )
+
+    if not isinstance(transactions, pd.DataFrame):
+        logger.error("Ошибка: Ожидается DataFrame в качестве входных данных.")
+        return pd.DataFrame()
+
     today_date = pd.to_datetime(current_date).date()
     start_date = today_date.replace(day=1)
 
